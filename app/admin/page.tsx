@@ -175,6 +175,15 @@ export default function AdminPage() {
         <circle cx="80%" cy="80%" r="2" className="detail-dot" style={{ animationDelay: '3.6s' }} />
       </svg>
 
+      {/* Background Image */}
+      <div className="absolute inset-0 w-full h-full pointer-events-none">
+        <img
+          src="/home-background.png"
+          alt="Background"
+          className="absolute top-0 left-1/2 transform -translate-x-1/2 w-1/3 h-1/3 object-cover opacity-30"
+        />
+      </div>
+
       {/* Floating Elements */}
       <div className="floating-element" style={{ top: '25%', left: '35%', animationDelay: '3s' }}></div>
       <div className="floating-element" style={{ top: '60%', left: '85%', animationDelay: '3.5s' }}></div>

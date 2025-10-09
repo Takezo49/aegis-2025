@@ -19,6 +19,15 @@ export default function Register() {
         <rect width="100%" height="100%" fill="url(#grid)" />
       </svg>
 
+      {/* Background Image */}
+      <div className="absolute inset-0 w-full h-full pointer-events-none">
+        <img
+          src="/home-background.png"
+          alt="Background"
+          className="absolute top-0 left-1/2 transform -translate-x-1/2 w-1/3 h-1/3 object-cover opacity-30"
+        />
+      </div>
+
       {/* Main Content */}
       <div className="relative z-10 min-h-screen flex flex-col justify-center items-center px-8 py-12">
         <div className="text-center max-w-2xl mx-auto w-full">

@@ -50,19 +50,28 @@ export default function HomePage() {
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)" />
-        
+
         {/* Main grid lines */}
         <line x1="0" y1="20%" x2="100%" y2="20%" className="grid-line" style={{ animationDelay: '0.5s' }} />
         <line x1="0" y1="80%" x2="100%" y2="80%" className="grid-line" style={{ animationDelay: '1s' }} />
         <line x1="20%" y1="0" x2="20%" y2="100%" className="grid-line" style={{ animationDelay: '1.5s' }} />
         <line x1="80%" y1="0" x2="80%" y2="100%" className="grid-line" style={{ animationDelay: '2s' }} />
-        
+
         {/* Detail dots */}
         <circle cx="20%" cy="20%" r="2" className="detail-dot" style={{ animationDelay: '3s' }} />
         <circle cx="80%" cy="20%" r="2" className="detail-dot" style={{ animationDelay: '3.2s' }} />
         <circle cx="20%" cy="80%" r="2" className="detail-dot" style={{ animationDelay: '3.4s' }} />
         <circle cx="80%" cy="80%" r="2" className="detail-dot" style={{ animationDelay: '3.6s' }} />
       </svg>
+
+      {/* Home Background Image */}
+      <div className="absolute inset-0 w-full h-full pointer-events-none">
+        <img
+          src="/home-background.png"
+          alt="Home Background"
+          className="absolute top-0 left-1/2 transform -translate-x-1/2 w-1/3 h-1/3 object-cover opacity-30"
+        />
+      </div>
 
       {/* Floating Elements */}
       <div className="floating-element" style={{ top: '25%', left: '35%', animationDelay: '3s' }}></div>
@@ -90,13 +99,15 @@ export default function HomePage() {
           <p className="text-xl leading-relaxed text-white/70 mb-12 max-w-2xl mx-auto">
             <span className="word" data-delay="1200">Test</span>
             <span className="word" data-delay="1350">your</span>
-            <span className="word" data-delay="1500">cybersecurity</span>
+            <span className="word" data-delay="1500">hacking</span>
             <span className="word" data-delay="1650">skills</span>
             <span className="word" data-delay="1800">in</span>
             <span className="word" data-delay="1950">the</span>
             <span className="word" data-delay="2100">ultimate</span>
-            <span className="word" data-delay="2250">hacking</span>
-            <span className="word" data-delay="2400">challenge.</span>
+            <span className="word" data-delay="2250">real</span>
+            <span className="word" data-delay="2320">world</span>
+            <span className="word" data-delay="2400">hacking</span>
+            <span className="word" data-delay="2470">challenge.</span>
           </p>
 
           {/* CTA Section */}
