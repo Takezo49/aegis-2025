@@ -2,11 +2,11 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-
-import { supabase } from '@/supabaseClient'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function AuthCallback() {
   const router = useRouter()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     const handleAuth = async () => {
@@ -27,7 +27,7 @@ export default function AuthCallback() {
     }
 
     handleAuth()
-  }, [router])
+  }, [router, supabase])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white">
