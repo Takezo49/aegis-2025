@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 export default function HomePage() {
@@ -113,10 +114,10 @@ export default function HomePage() {
           {/* CTA Section */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center opacity-0 animate-[word-appear_0.6s_ease-out_forwards]" style={{ animationDelay: '4s' }}>
             <button className="px-8 py-4 bg-white text-black font-bold text-lg hover:bg-white/90 transition-all duration-300 transform hover:scale-105">
-              <a href="/register" className="block w-full h-full">Register Now</a>
+              <Link href="/register" className="block w-full h-full">Register Now</Link>
             </button>
             <button className="px-8 py-4 border border-white text-white font-bold text-lg hover:bg-white hover:text-black transition-all duration-300 transform hover:scale-105">
-              <a href="/register?isLogin=true" className="block w-full h-full">Login</a>
+              <Link href="/register?isLogin=true" className="block w-full h-full">Login</Link>
             </button>
           </div>
           
