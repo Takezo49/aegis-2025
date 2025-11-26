@@ -227,61 +227,43 @@ export default function Dashboard() {
   useEffect(() => {
     const setupPlayer = async () => {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        // 1️⃣ Get authenticated user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
 
         if (userError || !user) {
-          console.error('No user found or auth error:', userError)
-          window.location.href = '/register'
-          return
+          console.error('No user found or auth error:', userError);
+          window.location.href = '/register';
+          return;
         }
 
-        console.log('Authenticated user:', user)
-        setUser(user)
+        setUser(user);
 
-        // Check if player exists and fetch profile data
+        // 2️⃣ Fetch player from 'players' table
         const { data: existingPlayer, error: checkError } = await supabase
           .from('players')
           .select('*')
           .eq('user_id', user.id)
-          .single()
+          .single();
 
         if (checkError && checkError.code !== 'PGRST116') {
-          console.error('Error checking existing player:', checkError)
-        }
-
-        // Fetch profile data if profiles table exists
-        let profileData = null
-        try {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-
-          if (!profileError && profile) {
-            profileData = profile
-          }
-        } catch (err) {
-          // Profiles table might not exist, continue without it
-          console.log('Profiles table not available, continuing without profile data')
+          console.error('Error checking existing player:', checkError);
         }
 
         if (existingPlayer) {
-          console.log('Player already exists:', existingPlayer)
-          setPlayer({ ...existingPlayer, profile: profileData || {} })
+          setPlayer(existingPlayer); // ✅ Use only players table
         } else {
-          console.log('No player found - user needs to create profile')
-          // Don't redirect automatically, let them go back to create profile if needed
+          console.log('No player found - user needs to create profile');
+          // You may want to redirect or let them create a new player entry
         }
       } catch (error) {
-        console.error('Error in setupPlayer:', error)
+        console.error('Error in setupPlayer:', error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    setupPlayer()
-  }, [])
+    setupPlayer();
+  }, []);
 
   if (loading) {
     return (
@@ -419,7 +401,7 @@ export default function Dashboard() {
 
               <p className="text-sm leading-relaxed text-white/70 max-w-xl">
                 <span className="word" data-delay="600">Greetings, </span>
-                <span className="word text-white font-semibold" data-delay="800">{player?.player_name || player?.username || player?.profile?.username || user?.email?.split('@')[0]}</span>
+                <span className="word text-white font-semibold" data-delay="800">{player?.player_name || player?.username || user?.email?.split('@')[0]}</span>
                 <span className="word" data-delay="1000">! Your digital fortress awaits.</span>
               </p>
             </div>
@@ -558,12 +540,12 @@ export default function Dashboard() {
                   <div className="bg-gradient-to-br from-white/10 to-white/5 rounded-xl border border-white/20 p-8">
                     <div className="text-center mb-6">
                       <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl font-bold shadow-lg">
-                        {(player?.player_name || player?.username || player?.profile?.username || user?.email?.[0] || 'P').toUpperCase()}
+                        {(player?.player_name || player?.username || user?.email?.[0] || 'P').toUpperCase()}
                       </div>
                       <h4 className="text-2xl font-bold">
-                        {player?.player_name || player?.username || player?.profile?.username || 'Player'}
+                        {player?.player_name || player?.username || 'Player'}
                       </h4>
-                      <p className="text-white/60">{player?.email || player?.profile?.email || user?.email}</p>
+                      <p className="text-white/60">{player?.email || user?.email}</p>
                       <div className="mt-2">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400 border border-green-500/30">
                           <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
@@ -576,7 +558,7 @@ export default function Dashboard() {
                       <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                         <span className="text-white/60">Member Since</span>
                         <span className="font-medium">
-                          {new Date(player?.created_at || player?.profile?.created_at || user?.created_at).toLocaleDateString()}
+                          {new Date(player?.created_at || user?.created_at).toLocaleDateString()}
                         </span>
                       </div>
                       <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
