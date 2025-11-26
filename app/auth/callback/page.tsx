@@ -8,25 +8,15 @@ export default function AuthCallback() {
   const router = useRouter()
 
   useEffect(() => {
-    const handleAuth = async () => {
-      const { data, error } = await supabase.auth.getSessionFromUrl({
-        storeSession: true
-      })
-
-      if (error) {
-        console.error('Auth callback error:', error)
-        router.replace('/auth/error')
-        return
+    const handleAuthStateChange = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        router.replace('/create-player')
       }
+    })
 
-      if (data?.session?.user) {
-        router.replace('/dashboard')
-      } else {
-        router.replace('/register')
-      }
+    return () => {
+      handleAuthStateChange.data.subscription.unsubscribe()
     }
-
-    handleAuth()
   }, [router])
 
   return <p>Loading...</p>
