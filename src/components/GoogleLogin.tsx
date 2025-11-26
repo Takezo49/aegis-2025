@@ -12,8 +12,7 @@ export default function GoogleLogin() {
         queryParams: {
           access_type: 'offline',
           prompt: 'consent'
-        },
-        skipBrowserRedirect: false
+        }
       }
     })
   }

@@ -8,31 +8,27 @@ export default function AuthCallback() {
   const router = useRouter()
 
   useEffect(() => {
-    async function handleCallback() {
+    const handleAuth = async () => {
       try {
-        const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href)
+        const { data, error } = await supabase.auth.getSessionFromUrl({
+          storeSession: true
+        })
 
         if (error) {
-          console.error('Auth Error:', error)
-          router.push('/auth/error')
+          console.error('Auth callback error:', error)
+          router.replace('/auth/error')
           return
         }
 
-        console.log('Logged in:', data.session.user?.email)
-
-        router.push('/create-player')
+        router.replace('/dashboard')
       } catch (err) {
         console.error(err)
-        router.push('/auth/error')
+        router.replace('/auth/error')
       }
     }
 
-    handleCallback()
+    handleAuth()
   }, [router])
 
-  return (
-    <div className="flex items-center justify-center min-h-screen text-white bg-black">
-      <p>Completing login...</p>
-    </div>
-  )
+  return <div>Loading...</div>
 }
