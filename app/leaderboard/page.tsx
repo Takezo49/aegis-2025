@@ -6,7 +6,7 @@ import { supabase } from '@/supabaseClient'
 
 interface Player {
   rank: number
-  player_name: string
+  username: string
   score: number
 }
 
@@ -41,7 +41,7 @@ export default function LeaderboardPage() {
     const fetchPlayers = async () => {
       const { data, error } = await supabase
         .from('players')
-        .select('player_name, score')
+        .select('username, score')
         .order('score', { ascending: false })
 
       if (error) {
@@ -52,7 +52,7 @@ export default function LeaderboardPage() {
       if (data) {
         const formattedPlayers: Player[] = data.map((player, index) => ({
           rank: index + 1,
-          player_name: player.player_name ?? 'Unknown Player',
+          username: player.username ?? 'Unknown Player',
           score: player.score ?? 0,
         }))
 
@@ -260,7 +260,7 @@ export default function LeaderboardPage() {
                       </div>
                       <div className="col-span-6 flex items-center">
                         <span className={`font-medium ${player.rank <= 3 ? 'text-white' : 'text-white/90'}`}>
-                          {player.player_name}
+                          {player.username}
                         </span>
                       </div>
                       <div className="col-span-3 flex items-center justify-center">
