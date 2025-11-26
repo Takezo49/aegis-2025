@@ -18,7 +18,7 @@ export default function GoogleLogin({
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/create-player`
+          redirectTo: 'https://aegis-2025.vercel.app/auth/callback'
         }
       })
 
