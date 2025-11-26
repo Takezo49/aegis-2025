@@ -7,12 +7,7 @@ export default function GoogleLogin() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'https://aegis-2025.vercel.app/auth/callback',
-        scopes: 'openid profile email',
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent'
-        }
+        redirectTo: 'https://aegis-2025.vercel.app/auth/callback'
       }
     })
   }
