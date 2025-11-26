@@ -12,18 +12,20 @@ export default function AuthCallback() {
     const handleAuth = async () => {
       try {
         const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(window.location.href)
-        window.history.replaceState({}, document.title, '/auth/callback')
-        const session = data.session
 
-        if (!session) {
+        if (sessionError) {
+          console.error('Session error:', sessionError)
           setError('Authentication failed')
           setLoading(false)
           return
         }
 
-        if (sessionError) {
-          console.error('Session error:', sessionError)
-          setError('Authentication failed')
+        window.history.replaceState({}, document.title, '/auth/callback')
+
+        const session = data.session
+
+        if (!session) {
+          setError('No session found')
           setLoading(false)
           return
         }
