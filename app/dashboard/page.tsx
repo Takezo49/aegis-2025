@@ -306,12 +306,14 @@ export default function Dashboard() {
     }
   }
 
-  async function verifyFlag(userFlag: string) {
-    const cleanFlag = userFlag.trim(); 
+  async function verifyFlag(machineId: string, flagType: string, submittedFlag: string) {
+    const cleanFlag = submittedFlag.trim();
 
     const { data, error } = await supabase
       .from('flags')
       .select('*')
+      .eq('machine_id', machineId)
+      .eq('flag_type', flagType)
       .eq('flag_value', cleanFlag)
       .single();
 
@@ -340,7 +342,7 @@ export default function Dashboard() {
 
     try {
       // 1️⃣ Verify flag using the verifyFlag function logic
-      const result = await verifyFlag(flagValue.trim())
+      const result = await verifyFlag(machineId, flagType, flagValue.trim())
       
       if (!result.success) {
         currentMachine[flagType + 'Msg'] = result.message
