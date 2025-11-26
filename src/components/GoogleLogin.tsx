@@ -8,7 +8,12 @@ export default function GoogleLogin() {
       provider: 'google',
       options: {
         redirectTo: 'https://aegis-2025.vercel.app/auth/callback',
-        scopes: 'openid profile email'
+        scopes: 'openid profile email',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        },
+        skipBrowserRedirect: false
       }
     })
   }
