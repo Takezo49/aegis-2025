@@ -1,37 +1,38 @@
 'use client'
 
 import { useEffect } from 'react'
+import { supabase } from '@/supabaseClient'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function AuthCallback() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
 
   useEffect(() => {
-    const handleAuth = async () => {
+    async function handleCallback() {
       try {
         const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href)
 
         if (error) {
-          console.error('Auth error:', error)
+          console.error('Auth Error:', error)
           router.push('/auth/error')
           return
         }
 
+        console.log('Logged in:', data.session.user?.email)
+
         router.push('/dashboard')
       } catch (err) {
-        console.error('Unexpected auth error:', err)
+        console.error(err)
         router.push('/auth/error')
       }
     }
 
-    handleAuth()
-  }, [router, supabase])
+    handleCallback()
+  }, [router])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black text-white">
-      <p>Redirecting...</p>
+    <div className="flex items-center justify-center min-h-screen text-white bg-black">
+      <p>Completing login...</p>
     </div>
   )
 }
