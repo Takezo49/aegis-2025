@@ -16,15 +16,14 @@ export default function AuthCallback() {
 
       if (error) {
         console.error('Auth callback error:', error)
+        router.push('/auth/error')
+        return
       }
 
-      window.history.replaceState({}, document.title, '/auth/callback')
+      const { user } = data.session
 
-      if (!data.session) {
-        console.error('No session found after callback')
-      }
-
-      router.push('/')
+      // Additional onboarding logic can go here
+      router.push('/dashboard')
     }
 
     handleAuth()
@@ -32,7 +31,7 @@ export default function AuthCallback() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white">
-      <p>Signing you in...</p>
+      <p>Redirecting...</p>
     </div>
   )
 }
