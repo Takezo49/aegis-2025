@@ -19,7 +19,7 @@ async function syncUser() {
     await supabase.from("players").insert([
       {
         user_id: user.id,
-        username: user.user_metadata.full_name || (user.email?.split("@")[0] || 'user')
+        username: user.user_metadata.full_name || user.email?.split("@")[0]
       }
     ]);
   }
