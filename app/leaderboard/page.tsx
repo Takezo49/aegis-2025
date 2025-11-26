@@ -40,19 +40,19 @@ export default function LeaderboardPage() {
   useEffect(() => {
     const fetchPlayers = async () => {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('player_name, score')
+        .from('players')
+        .select('username, score')
         .order('score', { ascending: false })
 
       if (error) {
-        console.error('Error fetching profiles:', error)
+        console.error('Error fetching players:', error)
         return
       }
 
       if (data) {
         const formattedPlayers: Player[] = data.map((player, index) => ({
           rank: index + 1,
-          username: player.player_name ?? 'Unknown Player',
+          username: player.username ?? 'Unknown Player',
           score: player.score ?? 0,
         }))
 
