@@ -5,17 +5,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/supabaseClient'
 
 interface Player {
-  id: number
-  user_id: string
   rank: number
-  username: string | null
-  player_name: string | null
-  email: string | null
-  avatar_url: string | null
-  bio: string | null
+  player_name: string
   score: number
-  solved?: number | null
-  lastSolved: string
 }
 
 interface Team {
@@ -49,7 +41,7 @@ export default function LeaderboardPage() {
     const fetchPlayers = async () => {
       const { data, error } = await supabase
         .from('players')
-        .select('*')
+        .select('player_name, score')
         .order('score', { ascending: false })
 
       if (error) {
@@ -59,17 +51,9 @@ export default function LeaderboardPage() {
 
       if (data) {
         const formattedPlayers: Player[] = data.map((player, index) => ({
-          id: player.id,
-          user_id: player.user_id,
           rank: index + 1,
-          username: player.username ?? null,
-          player_name: player.player_name ?? null,
-          email: player.email ?? null,
-          avatar_url: player.avatar_url ?? null,
-          bio: player.bio ?? null,
+          player_name: player.player_name ?? 'Unknown Player',
           score: player.score ?? 0,
-          solved: player.solved ?? null,
-          lastSolved: player.updated_at ? new Date(player.updated_at).toLocaleString() : 'Never'
         }))
 
         setPlayers(formattedPlayers)
@@ -255,20 +239,18 @@ export default function LeaderboardPage() {
 
                 <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
                   <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-white/5 text-white/80 text-sm font-medium">
-                    <div className="col-span-2 text-center">Rank</div>
-                    <div className="col-span-4">Player</div>
-                    <div className="col-span-2 text-center">Score</div>
-                    <div className="col-span-2 text-center">Solved</div>
-                    <div className="col-span-2 text-center">Last Activity</div>
+                    <div className="col-span-3 text-center">Rank</div>
+                    <div className="col-span-6">Player</div>
+                    <div className="col-span-3 text-center">Score</div>
                   </div>
 
                   {players.map((player, index) => (
                     <div
-                      key={player.id}
+                      key={player.rank}
                       className={`grid grid-cols-12 gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition-colors ${getRankStyle(player.rank)}`}
                       style={{ animationDelay: `${index * 0.1 + 0.5}s` }}
                     >
-                      <div className="col-span-2 flex items-center justify-center">
+                      <div className="col-span-3 flex items-center justify-center">
                         <div className="flex items-center space-x-2">
                           <span className="text-lg">{getRankIcon(player.rank)}</span>
                           <span className={`font-bold ${player.rank <= 3 ? 'text-white' : 'text-white/60'}`}>
@@ -276,24 +258,14 @@ export default function LeaderboardPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="col-span-4 flex items-center">
+                      <div className="col-span-6 flex items-center">
                         <span className={`font-medium ${player.rank <= 3 ? 'text-white' : 'text-white/90'}`}>
-                          {player.username || player.player_name || 'Unknown Player'}
+                          {player.player_name}
                         </span>
                       </div>
-                      <div className="col-span-2 flex items-center justify-center">
+                      <div className="col-span-3 flex items-center justify-center">
                         <span className={`font-bold ${player.rank <= 3 ? 'text-white' : 'text-white/90'}`}>
                           {player.score}
-                        </span>
-                      </div>
-                      <div className="col-span-2 flex items-center justify-center">
-                        <span className={`font-medium ${player.rank <= 3 ? 'text-white' : 'text-white/60'}`}>
-                          {player.solved ?? '—'}
-                        </span>
-                      </div>
-                      <div className="col-span-2 flex items-center justify-center">
-                        <span className={`text-xs ${player.rank <= 3 ? 'text-white/80' : 'text-white/50'}`}>
-                          {player.lastSolved}
                         </span>
                       </div>
                     </div>
@@ -384,7 +356,7 @@ export default function LeaderboardPage() {
                 <div className="text-3xl mb-2">🏆</div>
                 <div className="text-2xl font-bold text-blue-400 mb-1">
                   {activeTab === 'individual'
-                    ? players.reduce((sum, p) => sum + (p.solved ?? 0), 0)
+                    ? players.reduce((sum, p) => sum + p.score, 0)
                     : teams.reduce((sum, t) => sum + (t.solved || 0), 0)
                   }
                 </div>
