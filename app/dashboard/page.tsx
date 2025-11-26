@@ -224,44 +224,42 @@ export default function Dashboard() {
     fetchCurrentIP()
   }, [])
 
-  useEffect(() => {
-    const setupPlayer = async () => {
-      try {
-        // 1️⃣ Get authenticated user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const setupPlayer = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-        if (userError || !user) {
-          console.error('No user found or auth error:', userError);
-          window.location.href = '/register';
-          return;
-        }
-
-        setUser(user);
-
-        // 2️⃣ Fetch player from 'players' table
-        const { data: existingPlayer, error: checkError } = await supabase
-          .from('players')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (checkError && checkError.code !== 'PGRST116') {
-          console.error('Error checking existing player:', checkError);
-        }
-
-        if (existingPlayer) {
-          setPlayer(existingPlayer); // ✅ Use only players table
-        } else {
-          console.log('No player found - user needs to create profile');
-          // You may want to redirect or let them create a new player entry
-        }
-      } catch (error) {
-        console.error('Error in setupPlayer:', error);
-      } finally {
-        setLoading(false);
+      if (userError || !user) {
+        console.error('No user found or auth error:', userError);
+        window.location.href = '/register';
+        return;
       }
-    };
 
+      setUser(user);
+
+      // Fetch the player from the players table only
+      const { data: existingPlayer, error: checkError } = await supabase
+        .from('players')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing player:', checkError);
+      }
+
+      if (existingPlayer) {
+        setPlayer(existingPlayer); // ✅ No profile table here
+      } else {
+        console.log('No player found - create a new player entry if needed');
+      }
+    } catch (error) {
+      console.error('Error in setupPlayer:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     setupPlayer();
   }, []);
 
