@@ -306,23 +306,20 @@ export default function Dashboard() {
     }
   }
 
-  async function verifyFlag(machineId: string, flagType: string, submittedFlag: string) {
-    const cleanFlag = submittedFlag.trim();
+  const submitFlag = async (playerId: string, machineId: string, flag: string) => {
+    const { data, error } = await supabase.rpc("submit_flag_v2", {
+      p_player_id: playerId,
+      p_machine_id: machineId,
+      p_flag: flag.trim()
+    });
 
-    const { data, error } = await supabase
-      .from('flags')
-      .select('*')
-      .eq('machine_id', machineId)
-      .eq('flag_type', flagType)
-      .eq('flag_value', cleanFlag)
-      .single();
-
-    if (error || !data) {
-      return { success: false, message: "❌ Wrong flag!" };
+    if (error) {
+      console.error(error);
+      return "⚠️ Error submitting flag!";
     }
 
-    return { success: true, flag: data };
-  }
+    return data; // Returns the text message from SQL function
+  };
 
   async function submitMachineFlag(machineId: string, flagType: 'user' | 'root') {
     if (!player?.id) return
@@ -341,47 +338,24 @@ export default function Dashboard() {
     setMachineFlags(updatedFlags)
 
     try {
-      // 1️⃣ Verify flag using the verifyFlag function logic
-      const result = await verifyFlag(machineId, flagType, flagValue.trim())
-      
-      if (!result.success) {
-        currentMachine[flagType + 'Msg'] = result.message
-      } else {
-        // 2️⃣ Check if already submitted
-        const { data: existing } = await supabase
-          .from('user_flags')
+      // Use the RPC function for flag submission
+      const result = await submitFlag(player.id, machineId, flagValue)
+      currentMachine[flagType + 'Msg'] = result
+
+      // If successful, update the UI state
+      if (result.includes('✅') || result.includes('Already submitted')) {
+        currentMachine[flagType + 'Placeholder'] = flagValue.trim()
+        currentMachine[flagType + 'Flag'] = ''
+        
+        // Refresh player data to get updated score
+        const { data: updatedPlayer } = await supabase
+          .from('players')
           .select('*')
-          .eq('player_id', player.id)
-          .eq('machine_id', machineId)
-          .eq('flag_type', flagType)
+          .eq('id', player.id)
           .single()
-
-        if (existing) {
-          currentMachine[flagType + 'Msg'] = '✅ Already submitted!'
-          currentMachine[flagType + 'Placeholder'] = flagValue.trim()
-          currentMachine[flagType + 'Flag'] = ''
-        } else {
-          // 3️⃣ Insert into user_flags (persistent)
-          await supabase.from('user_flags').insert({
-            player_id: player.id,
-            machine_id: machineId,
-            flag_type: flagType,
-            flag_value: flagValue.trim()
-          })
-
-          // 4️⃣ Update player's score in database
-          const newScore = (player.score || 0) + (result.flag.points || 100)
-          await supabase
-            .from('players')
-            .update({ score: newScore })
-            .eq('id', player.id)
-
-          // 5️⃣ Update frontend state immediately
-          setPlayer(prev => ({ ...prev, score: newScore }))
-
-          currentMachine[flagType + 'Msg'] = `✅ Correct flag! +${result.flag.points || 100} points`
-          currentMachine[flagType + 'Placeholder'] = flagValue.trim()
-          currentMachine[flagType + 'Flag'] = ''
+        
+        if (updatedPlayer) {
+          setPlayer(updatedPlayer)
         }
       }
     } catch (err) {
