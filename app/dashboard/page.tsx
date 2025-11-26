@@ -306,28 +306,20 @@ export default function Dashboard() {
     }
   }
 
-  async function submitFlag(flagText: string, playerId: string) {
-    const { data, error } = await supabase.rpc('submit_flag', {
-      p_player_id: playerId,
-      p_flag: flagText
-    })
+  async function verifyFlag(userFlag: string) {
+    const cleanFlag = userFlag.trim(); 
 
-    if (error) {
-      console.error(error)
-      setSubmitMessage('❌ Error submitting flag!')
-      return
-    } else {
-      if (data === 'flag_accepted') {
-        setSubmitMessage('✅ Correct flag! Points added.')
-        setFlagInput('') // Clear the input on success
-      } else if (data === 'already_captured') {
-        setSubmitMessage('⚠️ Already submitted.')
-      } else {
-        setSubmitMessage('❌ Wrong flag.')
-      }
+    const { data, error } = await supabase
+      .from('flags')
+      .select('*')
+      .eq('flag_value', cleanFlag)
+      .single();
+
+    if (error || !data) {
+      return { success: false, message: "❌ Wrong flag!" };
     }
 
-    setIsSubmitting(false)
+    return { success: true, flag: data };
   }
 
   async function submitMachineFlag(machineId: string, flagType: 'user' | 'root') {
@@ -347,16 +339,11 @@ export default function Dashboard() {
     setMachineFlags(updatedFlags)
 
     try {
-      // 1️⃣ Check flag correctness
-      const { data: correctFlag } = await supabase
-        .from('flags')
-        .select('*')
-        .eq('machine_id', machineId)
-        .eq('flag_text', flagValue.trim())
-        .single()
-
-      if (!correctFlag) {
-        currentMachine[flagType + 'Msg'] = '❌ Wrong flag.'
+      // 1️⃣ Verify flag using the verifyFlag function logic
+      const result = await verifyFlag(flagValue.trim())
+      
+      if (!result.success) {
+        currentMachine[flagType + 'Msg'] = result.message
       } else {
         // 2️⃣ Check if already submitted
         const { data: existing } = await supabase
@@ -381,7 +368,7 @@ export default function Dashboard() {
           })
 
           // 4️⃣ Update player's score in database
-          const newScore = (player.score || 0) + (correctFlag.points || 100)
+          const newScore = (player.score || 0) + (result.flag.points || 100)
           await supabase
             .from('players')
             .update({ score: newScore })
@@ -390,7 +377,7 @@ export default function Dashboard() {
           // 5️⃣ Update frontend state immediately
           setPlayer(prev => ({ ...prev, score: newScore }))
 
-          currentMachine[flagType + 'Msg'] = `✅ Correct flag! +${correctFlag.points || 100} points`
+          currentMachine[flagType + 'Msg'] = `✅ Correct flag! +${result.flag.points || 100} points`
           currentMachine[flagType + 'Placeholder'] = flagValue.trim()
           currentMachine[flagType + 'Flag'] = ''
         }
