@@ -108,7 +108,6 @@ export default function CreatePlayerPage() {
         .from('players')
         .insert([{
           user_id: user.id,
-          email: user.email,
           username: username.trim()
         }])
         .select()
@@ -134,49 +133,6 @@ export default function CreatePlayerPage() {
       setLoading(false)
     }
   }
-
-  // Get authenticated user and check for existing player
-  useEffect(() => {
-    const checkUserAndPlayer = async () => {
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-
-        if (userError || !user) {
-          console.error('Auth error:', userError)
-          router.push('/register')
-          return
-        }
-
-        setUser(user)
-
-        // Check if player already exists
-        const { data: player, error: playerError } = await supabase
-          .from('players')
-          .select('*')
-          .eq('user_id', user.id)
-          .single()
-
-        if (playerError && playerError.code !== 'PGRST116') {
-          console.error('Error checking player:', playerError)
-          setError('Error checking player status')
-        } else if (player) {
-          // Player exists, redirect to dashboard
-          console.log('Player already exists:', player)
-          setPlayerExists(true)
-          router.push('/dashboard')
-        } else {
-          // No player exists, show creation form
-          console.log('No player found, showing creation form')
-          setPlayerExists(false)
-        }
-      } catch (err) {
-        console.error('Unexpected error:', err)
-        setError('Something went wrong')
-      }
-    }
-
-    checkUserAndPlayer()
-  }, [router])
 
   // Show success state with animation
   if (showSuccess) {
