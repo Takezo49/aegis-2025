@@ -32,23 +32,124 @@ interface Activity {
 }
 
 export default function Dashboard() {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const [showGradient, setShowGradient] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const [player, setPlayer] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  const [showGradient, setShowGradient] = useState(false)
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [player, setPlayer] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [currentTime, setCurrentTime] = useState<string>('')
   const [currentIP, setCurrentIP] = useState<string>('')
+  const [submitMessage, setSubmitMessage] = useState<string>('')
+  const [flagInput, setFlagInput] = useState<string>('')
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [machineFlags, setMachineFlags] = useState<any[]>([])
+  const [leaderboard, setLeaderboard] = useState<Player[]>([])
 
-  // Enhanced mock data
-  const players: Player[] = [
-    { rank: 1, name: "Alice", score: 120, solved: 3, lastSolved: "2 hours ago" },
-    { rank: 2, name: "Bob", score: 100, solved: 2, lastSolved: "4 hours ago" },
-    { rank: 3, name: "Charlie", score: 80, solved: 1, lastSolved: "6 hours ago" },
-    { rank: 4, name: "Diana", score: 60, solved: 1, lastSolved: "8 hours ago" },
-    { rank: 5, name: "Eve", score: 40, solved: 0, lastSolved: "Never" },
-  ]
+  useEffect(() => {
+    if (!player?.id) return
+
+    const fetchSubmittedFlags = async () => {
+      const { data, error } = await supabase
+        .from('user_flags')
+        .select('*')
+        .eq('player_id', player.id)
+
+      if (error) {
+        console.error('Error fetching submitted flags:', error)
+        return
+      }
+
+      // Merge with existing machineFlags
+      setMachineFlags(prev =>
+        prev.map(machine => {
+          const userFlag = data?.find(f => f.machine_id === machine.id && f.flag_type === 'user')
+          const rootFlag = data?.find(f => f.machine_id === machine.id && f.flag_type === 'root')
+
+          return {
+            ...machine,
+            userPlaceholder: userFlag?.flag_value || '',
+            rootPlaceholder: rootFlag?.flag_value || '',
+            userFlag: '',
+            rootFlag: '',
+            userMsg: userFlag ? '✅ Already submitted' : '',
+            rootMsg: rootFlag ? '✅ Already submitted' : ''
+          }
+        })
+      )
+    }
+
+    fetchSubmittedFlags()
+  }, [player])
+
+  // Load machines from database and initialize machineFlags with UUIDs
+  useEffect(() => {
+    const loadMachines = async () => {
+      const { data: machines } = await supabase.from('machines').select('id, name')
+      if (!machines) return
+
+      setMachineFlags(machines.map(m => ({
+        id: m.id, // UUID
+        name: m.name, // Display name
+        userFlag: '',
+        rootFlag: '',
+        userMsg: '',
+        rootMsg: '',
+        userSubmitting: false,
+        rootSubmitting: false,
+        userPlaceholder: '',
+        rootPlaceholder: ''
+      })))
+    }
+
+    loadMachines()
+  }, [])
+
+  async function fetchLeaderboard() {
+    const { data, error } = await supabase
+      .from('players')
+      .select(`
+        id,
+        username,
+        score,
+        created_at,
+        user_flags!inner(id)
+      `)
+      .order('score', { ascending: false }) // optional: order by score
+
+    if (error || !data) return
+
+    const leaderboardData = data.map((p, i) => ({
+      rank: i + 1,
+      name: p.username,
+      score: p.score || 0,
+      solved: p.user_flags?.length || 0,
+      lastSolved: new Date(p.created_at).toLocaleString(),
+    }))
+
+    setLeaderboard(leaderboardData)
+  }
+
+  useEffect(() => {
+    fetchLeaderboard()
+
+    // 🔥 Listen for real-time updates
+    const channel = supabase
+      .channel('leaderboard-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players' },
+        (payload) => {
+          console.log('Leaderboard updated:', payload)
+          fetchLeaderboard() // refetch or handle incremental update
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   const achievements: Achievement[] = [
     { id: '1', title: 'First Blood', description: 'Complete your first challenge', icon: '🩸', unlocked: true, rarity: 'common' },
@@ -137,7 +238,7 @@ export default function Dashboard() {
         console.log('Authenticated user:', user)
         setUser(user)
 
-        // Check if player exists
+        // Check if player exists and fetch profile data
         const { data: existingPlayer, error: checkError } = await supabase
           .from('players')
           .select('*')
@@ -148,9 +249,26 @@ export default function Dashboard() {
           console.error('Error checking existing player:', checkError)
         }
 
+        // Fetch profile data if profiles table exists
+        let profileData = null
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single()
+
+          if (!profileError && profile) {
+            profileData = profile
+          }
+        } catch (err) {
+          // Profiles table might not exist, continue without it
+          console.log('Profiles table not available, continuing without profile data')
+        }
+
         if (existingPlayer) {
           console.log('Player already exists:', existingPlayer)
-          setPlayer(existingPlayer)
+          setPlayer({ ...existingPlayer, profile: profileData || {} })
         } else {
           console.log('No player found - user needs to create profile')
           // Don't redirect automatically, let them go back to create profile if needed
@@ -188,14 +306,102 @@ export default function Dashboard() {
     }
   }
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'challenge_completed': return '🎯'
-      case 'streak_achieved': return '🔥'
-      case 'rank_up': return '📈'
-      case 'badge_earned': return '🏆'
-      default: return '📊'
+  async function submitFlag(flagText: string, playerId: string) {
+    const { data, error } = await supabase.rpc('submit_flag', {
+      p_player_id: playerId,
+      p_flag: flagText
+    })
+
+    if (error) {
+      console.error(error)
+      setSubmitMessage('❌ Error submitting flag!')
+      return
+    } else {
+      if (data === 'flag_accepted') {
+        setSubmitMessage('✅ Correct flag! Points added.')
+        setFlagInput('') // Clear the input on success
+      } else if (data === 'already_captured') {
+        setSubmitMessage('⚠️ Already submitted.')
+      } else {
+        setSubmitMessage('❌ Wrong flag.')
+      }
     }
+
+    setIsSubmitting(false)
+  }
+
+  async function submitMachineFlag(machineId: string, flagType: 'user' | 'root') {
+    if (!player?.id) return
+
+    const machineIndex = machineFlags.findIndex(m => m.id === machineId)
+    if (machineIndex === -1) return
+
+    const flagValue = flagType === 'user' ? machineFlags[machineIndex].userFlag : machineFlags[machineIndex].rootFlag
+    if (!flagValue.trim()) return
+
+    const updatedFlags = [...machineFlags]
+    const currentMachine = updatedFlags[machineIndex] as any
+
+    currentMachine[flagType + 'Submitting'] = true
+    currentMachine[flagType + 'Msg'] = ''
+    setMachineFlags(updatedFlags)
+
+    try {
+      // 1️⃣ Check flag correctness
+      const { data: correctFlag } = await supabase
+        .from('flags')
+        .select('*')
+        .eq('machine_id', machineId)
+        .eq('flag_text', flagValue.trim())
+        .single()
+
+      if (!correctFlag) {
+        currentMachine[flagType + 'Msg'] = '❌ Wrong flag.'
+      } else {
+        // 2️⃣ Check if already submitted
+        const { data: existing } = await supabase
+          .from('user_flags')
+          .select('*')
+          .eq('player_id', player.id)
+          .eq('machine_id', machineId)
+          .eq('flag_type', flagType)
+          .single()
+
+        if (existing) {
+          currentMachine[flagType + 'Msg'] = '✅ Already submitted!'
+          currentMachine[flagType + 'Placeholder'] = flagValue.trim()
+          currentMachine[flagType + 'Flag'] = ''
+        } else {
+          // 3️⃣ Insert into user_flags (persistent)
+          await supabase.from('user_flags').insert({
+            player_id: player.id,
+            machine_id: machineId,
+            flag_type: flagType,
+            flag_value: flagValue.trim()
+          })
+
+          // 4️⃣ Update player's score in database
+          const newScore = (player.score || 0) + (correctFlag.points || 100)
+          await supabase
+            .from('players')
+            .update({ score: newScore })
+            .eq('id', player.id)
+
+          // 5️⃣ Update frontend state immediately
+          setPlayer(prev => ({ ...prev, score: newScore }))
+
+          currentMachine[flagType + 'Msg'] = `✅ Correct flag! +${correctFlag.points || 100} points`
+          currentMachine[flagType + 'Placeholder'] = flagValue.trim()
+          currentMachine[flagType + 'Flag'] = ''
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      currentMachine[flagType + 'Msg'] = '❌ Error!'
+    }
+
+    currentMachine[flagType + 'Submitting'] = false
+    setMachineFlags(updatedFlags)
   }
 
   return (
@@ -250,7 +456,7 @@ export default function Dashboard() {
 
               <p className="text-sm leading-relaxed text-white/70 max-w-xl">
                 <span className="word" data-delay="600">Greetings, </span>
-                <span className="word text-white font-semibold" data-delay="800">{player?.player_name || user?.email?.split('@')[0]}</span>
+                <span className="word text-white font-semibold" data-delay="800">{player?.player_name || player?.username || player?.profile?.username || user?.email?.split('@')[0]}</span>
                 <span className="word" data-delay="1000">! Your digital fortress awaits.</span>
               </p>
             </div>
@@ -389,10 +595,12 @@ export default function Dashboard() {
                   <div className="bg-gradient-to-br from-white/10 to-white/5 rounded-xl border border-white/20 p-8">
                     <div className="text-center mb-6">
                       <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl font-bold shadow-lg">
-                        {(player?.player_name || user?.email?.[0] || 'P').toUpperCase()}
+                        {(player?.player_name || player?.username || player?.profile?.username || user?.email?.[0] || 'P').toUpperCase()}
                       </div>
-                      <h4 className="text-2xl font-bold">{player?.player_name || 'Player'}</h4>
-                      <p className="text-white/60">{user?.email}</p>
+                      <h4 className="text-2xl font-bold">
+                        {player?.player_name || player?.username || player?.profile?.username || 'Player'}
+                      </h4>
+                      <p className="text-white/60">{player?.email || player?.profile?.email || user?.email}</p>
                       <div className="mt-2">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400 border border-green-500/30">
                           <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
@@ -404,7 +612,9 @@ export default function Dashboard() {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                         <span className="text-white/60">Member Since</span>
-                        <span className="font-medium">{new Date(user?.created_at).toLocaleDateString()}</span>
+                        <span className="font-medium">
+                          {new Date(player?.created_at || player?.profile?.created_at || user?.created_at).toLocaleDateString()}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                         <span className="text-white/60">Last Active</span>
@@ -417,42 +627,12 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Stats Overview */}
-                  <div className="space-y-6">
-                    <div className="bg-white/5 rounded-xl border border-white/10 p-6">
-                      <h4 className="text-lg font-bold mb-4">Performance Stats</h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-400">0%</div>
-                          <div className="text-sm text-white/60">Success Rate</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-green-400">0</div>
-                          <div className="text-sm text-white/60">Avg. Time</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-purple-400">0</div>
-                          <div className="text-sm text-white/60">Hints Used</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-yellow-400">0</div>
-                          <div className="text-sm text-white/60">Best Streak</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white/5 rounded-xl border border-white/10 p-6">
-                      <h4 className="text-lg font-bold mb-4">Recent Badges</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {achievements.filter(a => a.unlocked).map((achievement) => (
-                          <div key={achievement.id} className={`p-2 rounded-lg border text-sm ${getRarityColor(achievement.rarity)}`}>
-                            <div className="flex items-center space-x-2">
-                              <span>{achievement.icon}</span>
-                              <span>{achievement.title}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                  {/* Performance Stats */}
+                  <div className="bg-white/5 rounded-xl border border-white/10 p-6">
+                    <h4 className="text-lg font-bold mb-4">Performance Stats</h4>
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-purple-400 mb-2">{player?.score || 0}</div>
+                      <div className="text-sm text-white/60 uppercase tracking-wide">Total Score</div>
                     </div>
                   </div>
                 </div>
@@ -461,9 +641,14 @@ export default function Dashboard() {
 
             {activeTab === 'leaderboards' && (
               <div className="max-w-6xl mx-auto">
-                <div className="mb-6 text-center">
-                  <h3 className="text-3xl font-bold mb-2">Global Leaderboard</h3>
-                  <p className="text-white/60">See how you stack up against the best</p>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-3xl font-bold text-white/90">Global Leaderboard</h3>
+                  <button
+                    onClick={fetchLeaderboard}
+                    className="px-4 py-2 rounded bg-blue-500 hover:bg-blue-600 text-white font-medium text-sm transition"
+                  >
+                    Refresh
+                  </button>
                 </div>
 
                 <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
@@ -475,45 +660,16 @@ export default function Dashboard() {
                     <div className="col-span-2 text-center">Last Activity</div>
                   </div>
 
-                  {players.map((player, index) => (
+                  {leaderboard.map((player, index) => (
                     <div
                       key={player.rank}
-                      className={`grid grid-cols-12 gap-4 p-6 border-b border-white/5 hover:bg-white/5 transition-all duration-200 ${player.rank <= 3 ? 'bg-gradient-to-r from-white/5 to-white/10' : ''}`}
-                      style={{ animationDelay: `${index * 0.1 + 0.5}s` }}
+                      className={`grid grid-cols-12 gap-4 p-6 border-b border-white/5 hover:bg-white/5 transition-all duration-200`}
                     >
-                      <div className="col-span-2 flex items-center justify-center">
-                        <div className="flex items-center space-x-3">
-                          <span className="text-2xl">{getRankIcon(player.rank)}</span>
-                          <span className={`font-bold text-lg ${player.rank <= 3 ? 'text-white' : 'text-white/60'}`}>
-                            #{player.rank}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="col-span-4 flex items-center">
-                        <div className={`w-8 h-8 rounded-full mr-3 flex items-center justify-center text-sm font-bold ${
-                          player.rank <= 3 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black' : 'bg-white/10'
-                        }`}>
-                          {player.name[0]}
-                        </div>
-                        <span className={`font-medium ${player.rank <= 3 ? 'text-white' : 'text-white/90'}`}>
-                          {player.name}
-                        </span>
-                      </div>
-                      <div className="col-span-2 flex items-center justify-center">
-                        <span className={`font-bold text-lg ${player.rank <= 3 ? 'text-white' : 'text-white/90'}`}>
-                          {player.score}
-                        </span>
-                      </div>
-                      <div className="col-span-2 flex items-center justify-center">
-                        <span className={`font-medium ${player.rank <= 3 ? 'text-white' : 'text-white/60'}`}>
-                          {player.solved}
-                        </span>
-                      </div>
-                      <div className="col-span-2 flex items-center justify-center">
-                        <span className={`text-sm ${player.rank <= 3 ? 'text-white/80' : 'text-white/50'}`}>
-                          {player.lastSolved}
-                        </span>
-                      </div>
+                      <div className="col-span-2 flex items-center justify-center">{player.rank}</div>
+                      <div className="col-span-4">{player.name}</div>
+                      <div className="col-span-2 flex items-center justify-center">{player.score}</div>
+                      <div className="col-span-2 flex items-center justify-center">{player.solved}</div>
+                      <div className="col-span-2 flex items-center justify-center">{player.lastSolved}</div>
                     </div>
                   ))}
                 </div>
@@ -521,104 +677,83 @@ export default function Dashboard() {
             )}
 
             {activeTab === 'progress' && (
-              <div className="max-w-4xl mx-auto">
-                <div className="text-center mb-8">
-                  <h3 className="text-3xl font-bold mb-4">Progress Tracking</h3>
-                  <p className="text-white/60">Monitor your cybersecurity journey</p>
-                </div>
+              <div className="max-w-3xl mx-auto space-y-4">
+                {machineFlags.map((machine) => (
+                  <div key={machine.id} className="bg-white/5 rounded-lg border border-white/10 p-4">
+                    <h4 className="text-lg font-bold mb-3 flex items-center">
+                      <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                      {machine.name?.toUpperCase() || machine.id.toUpperCase()}
+                    </h4>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Progress Overview */}
-                  <div className="space-y-6">
-                    <div className="bg-white/5 rounded-xl border border-white/10 p-6">
-                      <h4 className="text-xl font-bold mb-6">Challenge Categories</h4>
-                      <div className="space-y-4">
-                        {[
-                          { name: 'Web Security', completed: 0, total: 5, color: 'blue' },
-                          { name: 'Cryptography', completed: 0, total: 4, color: 'green' },
-                          { name: 'Forensics', completed: 0, total: 3, color: 'purple' },
-                          { name: 'Reverse Engineering', completed: 0, total: 2, color: 'red' }
-                        ].map((category) => (
-                          <div key={category.name} className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">{category.name}</span>
-                              <span className="text-sm text-white/60">{category.completed}/{category.total}</span>
-                            </div>
-                            <div className="w-full bg-white/10 rounded-full h-3">
-                              <div
-                                className={`bg-gradient-to-r from-${category.color}-500 to-${category.color}-600 h-3 rounded-full transition-all duration-500`}
-                                style={{ width: `${(category.completed / category.total) * 100}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        ))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* User Flag */}
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          placeholder={machine.userPlaceholder || "Enter USER flag..."}
+                          value={machine.userFlag}
+                          onChange={(e) => setMachineFlags(prev =>
+                            prev.map(m => m.id === machine.id ? { ...m, userFlag: e.target.value } : m)
+                          )}
+                          className={`w-full px-3 py-2 bg-white/10 border rounded text-sm text-white placeholder-white/50 focus:outline-none transition-all duration-200 ${
+                            machine.userPlaceholder
+                              ? 'border-green-400 bg-green-500/10 text-green-300 placeholder-green-300 cursor-not-allowed'
+                              : 'border-white/20 focus:ring-1 focus:ring-green-400'
+                          }`}
+                          disabled={machine.userSubmitting || !!machine.userPlaceholder}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') submitMachineFlag(machine.id, 'user')
+                          }}
+                        />
+                        {machine.userMsg && (
+                          <p className={`text-xs font-medium ${machine.userMsg.includes('✅') ? 'text-green-400' : machine.userMsg.includes('⚠️') ? 'text-yellow-400' : 'text-red-400'}`}>
+                            {machine.userMsg}
+                          </p>
+                        )}
+                        <button
+                          onClick={() => submitMachineFlag(machine.id, 'user')}
+                          disabled={machine.userSubmitting}
+                          className="w-full py-2 px-3 rounded bg-white hover:bg-gray-200 text-black text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {machine.userSubmitting ? 'Submitting...' : 'USER'}
+                        </button>
                       </div>
-                    </div>
 
-                    {/* Skill Development */}
-                    <div className="bg-white/5 rounded-xl border border-white/10 p-6">
-                      <h4 className="text-xl font-bold mb-6">Skill Development</h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        {[
-                          { skill: 'SQL Injection', level: 0, maxLevel: 5 },
-                          { skill: 'XSS Prevention', level: 0, maxLevel: 5 },
-                          { skill: 'Network Analysis', level: 0, maxLevel: 5 },
-                          { skill: 'Password Cracking', level: 0, maxLevel: 5 }
-                        ].map((skill) => (
-                          <div key={skill.skill} className="text-center p-4 bg-white/5 rounded-lg">
-                            <div className="text-sm font-medium mb-2">{skill.skill}</div>
-                            <div className="flex justify-center space-x-1">
-                              {Array.from({ length: skill.maxLevel }).map((_, i) => (
-                                <div
-                                  key={i}
-                                  className={`w-2 h-2 rounded-full ${i < skill.level ? 'bg-blue-400' : 'bg-white/20'}`}
-                                ></div>
-                              ))}
-                            </div>
-                            <div className="text-xs text-white/60 mt-1">Level {skill.level}/{skill.maxLevel}</div>
-                          </div>
-                        ))}
+                      {/* Root Flag */}
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          placeholder={machine.rootPlaceholder || "ROOT flag..."}
+                          value={machine.rootFlag}
+                          onChange={(e) => setMachineFlags(prev =>
+                            prev.map(m => m.id === machine.id ? { ...m, rootFlag: e.target.value } : m)
+                          )}
+                          className={`w-full px-3 py-2 bg-white/10 border rounded text-sm text-white placeholder-white/50 focus:outline-none transition-all duration-200 ${
+                            machine.rootPlaceholder
+                              ? 'border-green-400 bg-green-500/10 text-green-300 placeholder-green-300 cursor-not-allowed'
+                              : 'border-white/20 focus:ring-1 focus:ring-red-400'
+                          }`}
+                          disabled={machine.rootSubmitting || !!machine.rootPlaceholder}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') submitMachineFlag(machine.id, 'root')
+                          }}
+                        />
+                        {machine.rootMsg && (
+                          <p className={`text-xs font-medium ${machine.rootMsg.includes('✅') ? 'text-green-400' : machine.rootMsg.includes('⚠️') ? 'text-yellow-400' : 'text-red-400'}`}>
+                            {machine.rootMsg}
+                          </p>
+                        )}
+                        <button
+                          onClick={() => submitMachineFlag(machine.id, 'root')}
+                          disabled={machine.rootSubmitting}
+                          className="w-full py-2 px-3 rounded bg-white hover:bg-gray-200 text-black text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {machine.rootSubmitting ? 'Submitting...' : 'ROOT'}
+                        </button>
                       </div>
                     </div>
                   </div>
-
-                  {/* Detailed Progress */}
-                  <div className="space-y-6">
-                    <div className="bg-white/5 rounded-xl border border-white/10 p-6">
-                      <h4 className="text-xl font-bold mb-6">Detailed Statistics</h4>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
-                          <span className="text-white/60">Total Challenges Attempted</span>
-                          <span className="font-bold">0</span>
-                        </div>
-                        <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
-                          <span className="text-white/60">Success Rate</span>
-                          <span className="font-bold text-green-400">0%</span>
-                        </div>
-                        <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
-                          <span className="text-white/60">Average Completion Time</span>
-                          <span className="font-bold">0 min</span>
-                        </div>
-                        <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
-                          <span className="text-white/60">Hints Used</span>
-                          <span className="font-bold">0</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Motivational Section */}
-                    <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl p-6 text-center">
-                      <div className="text-4xl mb-4">🚀</div>
-                      <h4 className="text-xl font-bold mb-2">Ready for More?</h4>
-                      <p className="text-white/60 text-sm mb-4">
-                        Complete your first challenge to unlock detailed progress tracking and personalized recommendations!
-                      </p>
-                      <button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-2 px-6 rounded-lg transition-all duration-200">
-                        Start Learning
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
             )}
           </div>
