@@ -2,12 +2,20 @@
 
 import { useEffect, useState } from 'react'
 
+import { supabase } from '@/supabaseClient'
+
 interface Player {
+  id: number
+  user_id: string
   rank: number
-  name: string
+  username: string | null
+  player_name: string | null
+  email: string | null
+  avatar_url: string | null
+  bio: string | null
   score: number
-  solved: number
-  lastSolved?: string
+  solved?: number | null
+  lastSolved: string
 }
 
 interface Team {
@@ -23,15 +31,7 @@ export default function LeaderboardPage() {
   const [showGradient, setShowGradient] = useState(false)
   const [activeTab, setActiveTab] = useState<'individual' | 'team'>('individual')
   const [currentTime, setCurrentTime] = useState<string>('')
-
-  // Mock data as specified
-  const players: Player[] = [
-    { rank: 1, name: "Alice", score: 120, solved: 3, lastSolved: "2 hours ago" },
-    { rank: 2, name: "Bob", score: 100, solved: 2, lastSolved: "4 hours ago" },
-    { rank: 3, name: "Charlie", score: 80, solved: 1, lastSolved: "6 hours ago" },
-    { rank: 4, name: "Diana", score: 60, solved: 1, lastSolved: "8 hours ago" },
-    { rank: 5, name: "Eve", score: 40, solved: 0, lastSolved: "Never" },
-  ]
+  const [players, setPlayers] = useState<Player[]>([])
 
   const teams: Team[] = [
     { rank: 1, name: "RedFox", score: 200, members: ["Alice", "Bob"], solved: 5 },
@@ -43,6 +43,40 @@ export default function LeaderboardPage() {
   useEffect(() => {
     // Set current time only on client side to avoid hydration mismatch
     setCurrentTime(new Date().toLocaleTimeString())
+  }, [])
+
+  useEffect(() => {
+    const fetchPlayers = async () => {
+      const { data, error } = await supabase
+        .from('players')
+        .select('*')
+        .order('score', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching players:', error)
+        return
+      }
+
+      if (data) {
+        const formattedPlayers: Player[] = data.map((player, index) => ({
+          id: player.id,
+          user_id: player.user_id,
+          rank: index + 1,
+          username: player.username ?? null,
+          player_name: player.player_name ?? null,
+          email: player.email ?? null,
+          avatar_url: player.avatar_url ?? null,
+          bio: player.bio ?? null,
+          score: player.score ?? 0,
+          solved: player.solved ?? null,
+          lastSolved: player.updated_at ? new Date(player.updated_at).toLocaleString() : 'Never'
+        }))
+
+        setPlayers(formattedPlayers)
+      }
+    }
+
+    fetchPlayers()
   }, [])
 
   useEffect(() => {
@@ -230,7 +264,7 @@ export default function LeaderboardPage() {
 
                   {players.map((player, index) => (
                     <div
-                      key={player.rank}
+                      key={player.id}
                       className={`grid grid-cols-12 gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition-colors ${getRankStyle(player.rank)}`}
                       style={{ animationDelay: `${index * 0.1 + 0.5}s` }}
                     >
@@ -244,7 +278,7 @@ export default function LeaderboardPage() {
                       </div>
                       <div className="col-span-4 flex items-center">
                         <span className={`font-medium ${player.rank <= 3 ? 'text-white' : 'text-white/90'}`}>
-                          {player.name}
+                          {player.username || player.player_name || 'Unknown Player'}
                         </span>
                       </div>
                       <div className="col-span-2 flex items-center justify-center">
@@ -254,7 +288,7 @@ export default function LeaderboardPage() {
                       </div>
                       <div className="col-span-2 flex items-center justify-center">
                         <span className={`font-medium ${player.rank <= 3 ? 'text-white' : 'text-white/60'}`}>
-                          {player.solved}
+                          {player.solved ?? '—'}
                         </span>
                       </div>
                       <div className="col-span-2 flex items-center justify-center">
@@ -350,7 +384,7 @@ export default function LeaderboardPage() {
                 <div className="text-3xl mb-2">🏆</div>
                 <div className="text-2xl font-bold text-blue-400 mb-1">
                   {activeTab === 'individual'
-                    ? players.reduce((sum, p) => sum + p.solved, 0)
+                    ? players.reduce((sum, p) => sum + (p.solved ?? 0), 0)
                     : teams.reduce((sum, t) => sum + (t.solved || 0), 0)
                   }
                 </div>
