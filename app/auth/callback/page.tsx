@@ -20,7 +20,7 @@ export default function AuthCallback() {
 
         console.log('Logged in:', data.session.user?.email)
 
-        router.push('/dashboard')
+        router.push('/create-player')
       } catch (err) {
         console.error(err)
         router.push('/auth/error')
